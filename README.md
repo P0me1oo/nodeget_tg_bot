@@ -1,5 +1,7 @@
 # NodeGet 流量监控 & 消息通知 · js-worker 套件
 
+> **仓库地址**: <https://github.com/laozig/js_workers>
+
 为 [NodeGet](https://nodeget.com) 探针面板开发的两个 **js-worker** + 配套 **Dashboard 扩展**,完全运行在 NodeGet 边缘端(Server 内嵌的 QuickJS Runtime),**不改探针 agent 任何代码**。
 
 | Worker | 作用 | route_name | 扩展入口 |
@@ -19,13 +21,13 @@
 1. **JS Worker → 新建** `traffic-billing-worker`,贴 [traffic-billing-worker.js](traffic-billing-worker.js) → **保存代码**
 2. 打开「**设置**」→ 「**路由**」框填 `traffic-billing`(这一项就是 route_name);「**环境变量**」加一条 `token` = 你的 NodeGet 平台 Token
 3. **定时任务 → 创建定时任务**(⚠️ 必做):Task 类型 = **Server 任务**,Server 任务类型 = **JS Worker**,Worker Name = `traffic-billing-worker`,Cron = `0 */5 * * * *`,Parameters 留 `{}`
-4. (可选)**扩展管理** 装 `traffic-monitor-extension.zip` → 点「流量监控」→ 给机器开监控、设配额
+4. (可选)**扩展管理** 装 `traffic-monitor-extension.zip`(需本地打包,见下方「扩展打包」) → 点「流量监控」→ 给机器开监控、设配额
 
 **② 消息通知**
 1. **JS Worker → 新建** `notify-worker`,贴 [notify-worker.js](notify-worker.js) → **保存代码**
 2. 打开「**设置**」→ 「**路由**」框填 `notify`;「**环境变量**」加一条 `token` = 你的 NodeGet 平台 Token
 3. **定时任务 → 创建定时任务**(⚠️ 必做):Task 类型 = **Server 任务**,Server 任务类型 = **JS Worker**,Worker Name = `notify-worker`,Cron = `0 */2 * * * *`,Parameters 留 `{}`
-4. 装 `notify-extension.zip` → 点「消息通知」→ 开总开关、填 Telegram **Bot Token / Chat ID**、勾事件、**保存** → 点「发送测试消息」验证
+4. 装 `notify-extension.zip`(需本地打包) → 点「消息通知」→ 开总开关、填 Telegram **Bot Token / Chat ID**、勾事件、**保存** → 点「发送测试消息」验证
 
 **③ (可选)加访问密码**:给两个 worker 在「**环境变量**」各加一条 `route_secret` = 一串随机字符(相当于配置页的登录密码)。设了之后打开配置页要先输入它登录,本机记住、以后免输;不设则知道地址的人就能打开。详见下方「安全」。
 
@@ -51,8 +53,7 @@ Js-Worker/
 │   ├── app.json
 │   └── resources/{index.html, assets/icon.svg}
 │
-├── traffic-monitor-extension.zip           # 打包好的扩展(扩展管理 → 安装)
-└── notify-extension.zip
+└── ...                                     # (打包好的 zip 已移至 .gitignore,需本地打包)
 ```
 
 > **扩展只是前端壳**(`limits` 为空、不需要任何权限):打开后同源跳转到对应 worker 的 `/ui` 页面,数据读写全部由 worker 用自身 `env.token` 完成。worker 与扩展是两套东西,**worker 靠「保存代码」部署,扩展靠「扩展管理 → 安装」**。
@@ -241,6 +242,22 @@ NodeGet 主控的「**主题管理**」支持填入一个**主题托管地址**,
 - `type: global` → 出现在「应用扩展」区;`type: node` → 每台机器详情页也有入口(traffic 用,带 `#node=<uuid>` 自动定位高亮)。
 - 壳 `index.html` 跳转到 `/nodeget/worker-route/{route_name}/ui`。**改了 worker 的 `route_name`,要同步改壳里的跳转地址**。
 - 安装:扩展管理 → 安装 → 选 `*-extension.zip` 或对应文件夹。
+
+---
+
+## 扩展打包
+
+扩展源码在 `extension/` 和 `notify-extension/` 目录,zip 文件已从仓库移除。本地打包:
+
+```bash
+# 流量监控扩展
+cd extension && zip -r ../traffic-monitor-extension.zip . && cd ..
+
+# 消息通知扩展
+cd notify-extension && zip -r ../notify-extension.zip . && cd ..
+```
+
+打包后在 NodeGet「扩展管理 → 安装」即可。
 
 ---
 
