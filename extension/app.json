@@ -1,0 +1,26 @@
+{
+  "name": "traffic-monitor",
+  "icon": "assets/icon.svg",
+  "routes": [
+    {
+      "type": "global",
+      "name": "流量监控",
+      "icon": "assets/icon.svg",
+      "entry": "index.html"
+    },
+    {
+      "type": "node",
+      "name": "流量监控",
+      "icon": "assets/icon.svg",
+      "entry": "index.html"
+    }
+  ],
+  "limits": [],
+  "version": "1.0",
+  "description": "逐台节点流量周期记账与配额告警(前端壳，数据由 traffic-billing-worker 提供)",
+  "extension_version": 1,
+  "author": "",
+  "repository": "",
+  "homepage": "",
+  "license": "MIT"
+}

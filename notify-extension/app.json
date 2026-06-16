@@ -1,0 +1,20 @@
+{
+  "name": "notify",
+  "icon": "assets/icon.svg",
+  "routes": [
+    {
+      "type": "global",
+      "name": "消息通知",
+      "icon": "assets/icon.svg",
+      "entry": "index.html"
+    }
+  ],
+  "limits": [],
+  "version": "1.0",
+  "description": "节点离线/上线、到期、流量超限事件的 Telegram 通知配置(前端壳,数据由 notify-worker 提供)",
+  "extension_version": 1,
+  "author": "",
+  "repository": "",
+  "homepage": "",
+  "license": "MIT"
+}

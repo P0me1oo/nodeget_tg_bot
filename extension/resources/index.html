@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>流量监控</title>
+  <style>
+    *{box-sizing:border-box}
+    html,body{margin:0;height:100%}
+    body{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;
+      font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#e8ebf2;
+      background:radial-gradient(800px 500px at 50% 0%,rgba(124,131,255,.18),transparent),#0a0e1a}
+    .ring{width:42px;height:42px;border-radius:50%;border:3px solid rgba(255,255,255,.12);
+      border-top-color:#8b5cf6;animation:spin .8s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .t{font-size:17px;font-weight:800;letter-spacing:.3px;
+      background:linear-gradient(90deg,#a5b4fc,#c4b5fd);-webkit-background-clip:text;background-clip:text;color:transparent}
+    .s{font-size:12px;color:#8b93a7}
+    .fallback{font-size:12px;color:#8b93a7;text-decoration:underline;margin-top:4px}
+  </style>
+</head>
+<body>
+  <div class="ring"></div>
+  <div class="t">流量监控</div>
+  <div class="s">正在加载配置面板…</div>
+  <a class="fallback" id="fb" style="display:none">点此手动进入</a>
+  <script>
+    // 扩展 iframe 注入 #?token=..&node=<AGENT_UUID>&theme=..
+    // 同源跳转到 worker 内置 /ui(worker 用自身 env.token 取数,无需扩展 token)
+    (function () {
+      var p = new URLSearchParams(location.hash.slice(1).replace(/^\?/, ""));
+      var node = p.get("node") || "";
+      var q = new URLSearchParams(location.search);
+      var s = q.get("s") || q.get("secret") || "";   // 私密链接密钥(设了 route_secret 时)透传给 /ui
+      // 与 worker 的 route_name 对应,改了 route_name 同步这里
+      var url = "/nodeget/worker-route/traffic-billing/ui" + (s ? "?s=" + encodeURIComponent(s) : "") + (node ? "#node=" + encodeURIComponent(node) : "");
+      var fb = document.getElementById("fb");
+      fb.href = url;
+      setTimeout(function () { fb.style.display = "block"; }, 1500); // 跳转异常时给个手动入口
+      location.replace(url);
+    })();
+  </script>
+</body>
+</html>
