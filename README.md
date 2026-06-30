@@ -80,7 +80,7 @@ flowchart LR
 |---|---|---|---|
 | `traffic-billing-worker` | `traffic-billing` | `0 */5 * * * *` | 每 5 分钟审计流量 |
 | `stream-unlock-worker` | `stream-unlock` | `0 0 0,12 * * *` | 一天两次；首访 `GET /results` 或 `GET /run` 自举 |
-| `notify-worker` | `notify` | `0 */2 * * * *` | 每 2 分钟检测事件；Telegram 在扩展面板填 |
+| `notify-worker` | `notify` | `0 */2 * * * *` | 每 2 分钟检测事件；`/chatid` 通过 webhook 实时回复 |
 | `log-cleanup-worker` | `log-cleanup` | 无需 Server cron | 改用 `GET /install` 给各机装本地清理 cron |
 
 **扩展**（在「扩展管理 → 安装」装对应 zip）：
@@ -114,9 +114,10 @@ flowchart LR
 
 离线/上线/到期/流量超额 → Telegram（对齐 Komari）。90 秒无上报判离线、合并成条、失败重试；到期每天一次；超额经 `inlineCall` 读 traffic 告警节点。
 
-- **Worker**：`onCall` `get_config` / `set_config` / `test` / `run` / `get_state`。**已移除内置 `/ui` 与 `onRoute`**（v1.2）——只剩 `onCron` 引擎 + `onCall`。
-- **扩展**（`notify-extension/`）：iframe 完整配置面板，用 NodeGet Token 调 `js-worker_run` → 轮询 `js-result_query`，和 Docker/流量监控一致。Telegram 的 `bot_token` / `chat_id` 在扩展面板填（存 KV、打码回显），**不在 env**。
-- env：`token`（NodeGet 平台 Token，**不是** Telegram token）。
+- **Worker**：`onCall` `get_config` / `set_config` / `test` / `run` / `get_state`；`onCron` 负责事件检测；`onRoute` 只负责 Telegram webhook 注册、注销和 update 接收，不提供内置 `/ui`。
+- **扩展**（`notify-extension/`）：iframe 完整配置面板，用 NodeGet Token 调 `js-worker_run` → 轮询 `js-result_query`，和 Docker/流量监控一致。Telegram 的 `bot_token` / 通知目标列表 / `webhook_admin_secret` 可在扩展面板填（存 KV、打码回显）；每个通知目标可单独配置 Chat ID、话题 ID、离线、恢复、到期、流量和启用状态。也可在 Telegram 内发送 `/chatid` 让 Bot 实时回复当前会话 ID。
+- **Telegram webhook**：worker 需设置 `route_name`（示例 `notify`），并确保该 HTTPS 路由可被 Telegram 访问；保存 Bot Token 后访问 `https://你的域名/nodeget/worker-route/notify/registerWebhook` 注册。如配置了 Webhook 管理密钥，注册、注销和查询时加 `?s=密钥`。注销为 `/unRegisterWebhook`，查询为 `/webhookInfo`。
+- env：`token`（NodeGet 平台 Token，**不是** Telegram token）；`webhook_admin_secret`（可选，和扩展面板配置二选一或同时保留）。
 
 ## 四、日志清理 · log-cleanup
 
@@ -204,7 +205,7 @@ EOF
 | 流量扩展打不开 / 列表空 | 安装时没授予 JsWorker 运行 + JsResult 读权限；或 worker 脚本名 ≠ `traffic-billing-worker` |
 | Docker 扩展报权限 | 机器没装 docker，或 Agent 无 `docker.sock` 访问权限（root/`docker` 组） |
 | 日志清理 `denied` | Agent 进程对日志文件无写权限，需提权或改属主 |
-| 通知完全不发 | notify 没建定时任务 / 没开总开关 / 事件没勾 / Telegram 没填 |
+| 通知完全不发 | notify 没建定时任务 / 没开总开关 / 目标未启用对应事件 / Telegram 没填 |
 | 扩展装进 board 找不到页面 | zip 路径必须正斜杠（见「扩展打包」，用 Python 打包） |
 
 ---

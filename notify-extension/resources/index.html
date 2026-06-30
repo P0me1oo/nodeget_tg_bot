@@ -40,57 +40,64 @@
         <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
         Telegram 发送设置
       </h3>
-      <div class="d">从 @BotFather 获取 Bot Token；Chat ID 可填数字 id 或 @频道名。</div>
+      <div class="d">从 @BotFather 获取 Bot Token；每个通知目标可单独选择接收的事件。</div>
       <div class="body">
         <label class="f">Bot Token<span class="req">*</span></label>
-        <input id="bot_token" class="input" placeholder="123456:ABC-DEF..." autocomplete="off" />
-        <div class="grid2">
-          <div>
-            <label class="f">Chat ID<span class="req">*</span></label>
-            <input id="chat_id" class="input" placeholder="@yourchannel 或 123456789" />
-          </div>
-          <div>
-            <label class="f">话题 ID<span class="opt">可选 · 超级群</span></label>
-            <input id="message_thread_id" class="input" placeholder="可选" />
-          </div>
+        <div class="secret-field">
+          <input id="bot_token" class="input" type="password" placeholder="123456:ABC-DEF..." autocomplete="off" />
+          <button class="secret-toggle" type="button" data-target="bot_token" aria-label="显示 Bot Token" title="显示 Bot Token">
+            <svg class="eye eye-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>
+            <svg class="eye eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2 2 20 20"/><path d="M6.71 6.71A10.5 10.5 0 0 0 2.062 11.65a1 1 0 0 0 0 .696 10.75 10.75 0 0 0 15.18 5.92"/><path d="M9.88 9.88A3 3 0 0 0 14.12 14.12"/><path d="M12 5c4.2 0 7.79 2.44 9.938 6.65a1 1 0 0 1 0 .696 10.8 10.8 0 0 1-2.01 3.01"/></svg>
+          </button>
+        </div>
+        <div class="target-head">
+          <label class="f">通知目标列表</label>
+          <button id="add_target" class="btn btn-sm" type="button">新增目标</button>
+        </div>
+        <div class="target-table-wrap">
+          <table class="target-table">
+            <thead>
+              <tr>
+                <th>名称</th>
+                <th>Chat ID<span class="req">*</span></th>
+                <th>话题 ID</th>
+                <th>离线</th>
+                <th>恢复</th>
+                <th>到期</th>
+                <th>流量</th>
+                <th>启用</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="targets_body"></tbody>
+          </table>
         </div>
         <label class="f">请求端点<span class="req">*</span></label>
         <input id="endpoint" class="input" placeholder="https://api.telegram.org/bot" />
         <div class="hint">通常为 https://api.telegram.org/bot；被墙时可填反代地址。</div>
+        <label class="f">Webhook 管理密钥<span class="opt">可选</span></label>
+        <div class="secret-field">
+          <input id="webhook_admin_secret" class="input" type="password" placeholder="留空不修改" autocomplete="off" />
+          <button class="secret-toggle" type="button" data-target="webhook_admin_secret" aria-label="显示 Webhook 管理密钥" title="显示 Webhook 管理密钥">
+            <svg class="eye eye-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>
+            <svg class="eye eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2 2 20 20"/><path d="M6.71 6.71A10.5 10.5 0 0 0 2.062 11.65a1 1 0 0 0 0 .696 10.75 10.75 0 0 0 15.18 5.92"/><path d="M9.88 9.88A3 3 0 0 0 14.12 14.12"/><path d="M12 5c4.2 0 7.79 2.44 9.938 6.65a1 1 0 0 1 0 .696 10.8 10.8 0 0 1-2.01 3.01"/></svg>
+          </button>
+        </div>
+        <div class="hint">用于保护 registerWebhook、webhookInfo、unRegisterWebhook 管理路由。</div>
       </div>
     </div>
 
-    <!-- 事件 -->
+    <!-- 事件参数 -->
     <div class="card">
       <h3>
         <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" x2="4" y1="22" y2="15"/></svg>
-        通知事件
+        事件参数
       </h3>
-      <div class="d">选择要推送的事件类型。</div>
-      <div class="body events">
-        <label class="ev" id="ev_offline_row">
-          <span class="emo">🔴</span>
-          <span class="meta"><div class="n">节点离线</div><div class="s">90 秒无上报判离线；同轮多台合并一条</div></span>
-          <input type="checkbox" id="ev_offline" />
-        </label>
-        <label class="ev" id="ev_online_row">
-          <span class="emo">🟢</span>
-          <span class="meta"><div class="n">恢复在线</div><div class="s">离线节点重新上报后通知</div></span>
-          <input type="checkbox" id="ev_online" />
-        </label>
-        <label class="ev" id="ev_expire_row">
-          <span class="emo">⏰</span>
-          <span class="meta"><div class="n">到期提醒</div><div class="s">临期每天提醒一次，续费即停</div></span>
-          <input type="checkbox" id="ev_expire" />
-        </label>
-        <label class="ev" id="ev_traffic_row">
-          <span class="emo">📊</span>
-          <span class="meta"><div class="n">流量超配额</div><div class="s">需 traffic-billing-worker；80% 起每 +5% 报一次</div></span>
-          <input type="checkbox" id="ev_traffic" />
-        </label>
-        <div style="margin-top:4px">
+      <div class="d">事件是否发送由通知目标列表逐行控制。</div>
+      <div class="body">
+        <div>
           <label class="f">到期提前提醒（天）</label>
-          <input type="number" id="expire_days" class="input" min="1" max="90" value="7" style="max-width:160px" />
+          <input type="number" id="expire_days" class="input compact-input" min="1" max="90" value="7" />
         </div>
       </div>
     </div>

@@ -24,6 +24,9 @@ const $ = (id) => document.getElementById(id);
 const bannerEl = $("banner");
 const toastEl = $("toast");
 const EVENTS = ["offline", "online", "expire", "traffic"];
+const EVENT_LABELS = { offline: "离线", online: "恢复", expire: "到期", traffic: "流量" };
+const DEFAULT_TARGET_EVENTS = { offline: true, online: true, expire: true, traffic: false };
+let targetRows = [];
 
 function showBanner(m) { bannerEl.textContent = m; bannerEl.classList.remove("hidden"); }
 function clearBanner() { bannerEl.textContent = ""; bannerEl.classList.add("hidden"); }
@@ -72,44 +75,177 @@ async function call(action, extra) {
 }
 
 // ---- 表单填充 / 收集 ----
-function syncEventRow(ev) {
-  const row = $("ev_" + ev + "_row");
-  if (row) row.classList.toggle("on", $("ev_" + ev).checked);
+function configureSecretInput(id, isSet, hint, emptyPlaceholder) {
+  const input = $(id);
+  const toggle = document.querySelector('.secret-toggle[data-target="' + id + '"]');
+  input.value = "";
+  input.type = "password";
+  input.dataset.maskedPlaceholder = isSet ? "********，留空不修改" : emptyPlaceholder;
+  input.dataset.visiblePlaceholder = isSet ? "已配置 " + (hint || "") + "，留空不修改" : emptyPlaceholder;
+  input.placeholder = input.dataset.maskedPlaceholder;
+  if (toggle) {
+    toggle.classList.remove("on");
+    const label = toggle.getAttribute("aria-label") || "显示";
+    const normalized = label.replace(/^隐藏/, "显示");
+    toggle.setAttribute("aria-label", normalized);
+    toggle.setAttribute("title", normalized);
+  }
+}
+function setupSecretToggles() {
+  document.querySelectorAll(".secret-toggle").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const input = $(btn.dataset.target);
+      const show = input.type === "password";
+      input.type = show ? "text" : "password";
+      input.placeholder = show ? input.dataset.visiblePlaceholder : input.dataset.maskedPlaceholder;
+      btn.classList.toggle("on", show);
+      const base = btn.dataset.target === "bot_token" ? "Bot Token" : "Webhook 管理密钥";
+      const label = (show ? "隐藏 " : "显示 ") + base;
+      btn.setAttribute("aria-label", label);
+      btn.setAttribute("title", label);
+    });
+  });
+}
+function normalizeEventFlags(events, fallback) {
+  events = events && typeof events === "object" ? events : {};
+  fallback = fallback && typeof fallback === "object" ? fallback : DEFAULT_TARGET_EVENTS;
+  return {
+    offline: events.offline != null ? events.offline !== false : fallback.offline !== false,
+    online: events.online != null ? events.online !== false : fallback.online !== false,
+    expire: events.expire != null ? events.expire !== false : fallback.expire !== false,
+    traffic: events.traffic != null ? events.traffic === true : fallback.traffic === true,
+  };
+}
+function blankTarget() {
+  return { name: "", chat_id: "", message_thread_id: "", events: { ...DEFAULT_TARGET_EVENTS }, enabled: true };
+}
+function normalizeTarget(target, fallbackEvents) {
+  target = target && typeof target === "object" ? target : {};
+  return {
+    name: String(target.name || "").trim(),
+    chat_id: String(target.chat_id || target.chatId || "").trim(),
+    message_thread_id: String(target.message_thread_id || target.messageThreadId || "").trim(),
+    events: normalizeEventFlags(target.events, fallbackEvents),
+    enabled: target.enabled !== false,
+  };
+}
+function parseLegacyTargets(c) {
+  const fallbackEvents = normalizeEventFlags(c.events);
+  return String(c.chat_id || "")
+    .split(/[,\r\n]+/)
+    .map((chatId) => chatId.trim())
+    .filter(Boolean)
+    .map((chatId) => normalizeTarget({ chat_id: chatId, message_thread_id: c.message_thread_id, events: fallbackEvents }, fallbackEvents));
+}
+function setCellLabel(cell, text) {
+  const span = document.createElement("span");
+  span.className = "cell-label";
+  span.textContent = text;
+  cell.appendChild(span);
+}
+function makeTextInput(value, placeholder, onInput) {
+  const input = document.createElement("input");
+  input.className = "input target-input";
+  input.value = value || "";
+  input.placeholder = placeholder;
+  input.addEventListener("input", () => onInput(input.value));
+  return input;
+}
+function makeCheckbox(checked, label, onChange) {
+  const wrap = document.createElement("label");
+  wrap.className = "target-check";
+  wrap.title = label;
+  const input = document.createElement("input");
+  input.type = "checkbox";
+  input.checked = !!checked;
+  input.setAttribute("aria-label", label);
+  input.addEventListener("change", () => onChange(input.checked));
+  wrap.appendChild(input);
+  return wrap;
+}
+function renderTargets() {
+  const body = $("targets_body");
+  body.textContent = "";
+  targetRows.forEach((target, index) => {
+    const row = document.createElement("tr");
+
+    const nameCell = document.createElement("td");
+    setCellLabel(nameCell, "名称");
+    nameCell.appendChild(makeTextInput(target.name, "可选", (value) => { targetRows[index].name = value.trim(); }));
+    row.appendChild(nameCell);
+
+    const chatCell = document.createElement("td");
+    setCellLabel(chatCell, "Chat ID");
+    chatCell.appendChild(makeTextInput(target.chat_id, "-100xxxxxx", (value) => { targetRows[index].chat_id = value.trim(); }));
+    row.appendChild(chatCell);
+
+    const threadCell = document.createElement("td");
+    setCellLabel(threadCell, "话题 ID");
+    threadCell.appendChild(makeTextInput(target.message_thread_id, "可选", (value) => { targetRows[index].message_thread_id = value.trim(); }));
+    row.appendChild(threadCell);
+
+    EVENTS.forEach((ev) => {
+      const cell = document.createElement("td");
+      cell.className = "target-flag";
+      setCellLabel(cell, EVENT_LABELS[ev]);
+      cell.appendChild(makeCheckbox(target.events[ev], EVENT_LABELS[ev], (checked) => { targetRows[index].events[ev] = checked; }));
+      row.appendChild(cell);
+    });
+
+    const enabledCell = document.createElement("td");
+    enabledCell.className = "target-flag";
+    setCellLabel(enabledCell, "启用");
+    enabledCell.appendChild(makeCheckbox(target.enabled, "启用", (checked) => { targetRows[index].enabled = checked; }));
+    row.appendChild(enabledCell);
+
+    const actionCell = document.createElement("td");
+    actionCell.className = "target-action";
+    const del = document.createElement("button");
+    del.type = "button";
+    del.className = "btn btn-ghost btn-xs";
+    del.textContent = "删除";
+    del.addEventListener("click", () => {
+      targetRows.splice(index, 1);
+      if (!targetRows.length) targetRows.push(blankTarget());
+      renderTargets();
+    });
+    actionCell.appendChild(del);
+    row.appendChild(actionCell);
+
+    body.appendChild(row);
+  });
+}
+function collectTargets() {
+  const rows = targetRows.map((target) => normalizeTarget(target, DEFAULT_TARGET_EVENTS));
+  const filled = rows.filter((target) => target.chat_id || target.name || target.message_thread_id);
+  const missingChat = filled.find((target) => !target.chat_id);
+  if (missingChat) throw new Error("通知目标「" + (missingChat.name || "未命名") + "」缺少 Chat ID");
+  return filled.filter((target) => target.chat_id);
 }
 function fill(c) {
   c = c || {};
   $("enabled").checked = !!c.enabled;
   $("template").value = c.template || "";
-  $("bot_token").value = "";
-  $("bot_token").placeholder = c.bot_token_set
-    ? "已配置 " + (c.bot_token_hint || "") + "，留空不修改"
-    : "123456:ABC-DEF...";
-  $("chat_id").value = c.chat_id || "";
-  $("message_thread_id").value = c.message_thread_id || "";
+  configureSecretInput("bot_token", c.bot_token_set, c.bot_token_hint, "123456:ABC-DEF...");
+  targetRows = Array.isArray(c.targets) && c.targets.length
+    ? c.targets.map((target) => normalizeTarget(target, c.events))
+    : parseLegacyTargets(c);
+  if (!targetRows.length) targetRows = [blankTarget()];
+  renderTargets();
   $("endpoint").value = c.endpoint || "https://api.telegram.org/bot";
-  const ev = c.events || {};
-  $("ev_offline").checked = ev.offline !== false;
-  $("ev_online").checked = ev.online !== false;
-  $("ev_expire").checked = ev.expire !== false;
-  $("ev_traffic").checked = ev.traffic === true;
+  configureSecretInput("webhook_admin_secret", c.webhook_admin_secret_set, c.webhook_admin_secret_hint, "可选，建议使用长随机字符");
   $("expire_days").value = c.expire_days || 7;
-  EVENTS.forEach(syncEventRow);
 }
 function collect() {
+  const targets = collectTargets();
   return {
     enabled: $("enabled").checked,
     channel: "telegram",
     bot_token: $("bot_token").value.trim(), // 留空 = 保留原 token（worker 端处理）
-    chat_id: $("chat_id").value.trim(),
-    message_thread_id: $("message_thread_id").value.trim(),
+    targets,
+    webhook_admin_secret: $("webhook_admin_secret").value.trim(),
     endpoint: $("endpoint").value.trim(),
     template: $("template").value,
-    events: {
-      offline: $("ev_offline").checked,
-      online: $("ev_online").checked,
-      expire: $("ev_expire").checked,
-      traffic: $("ev_traffic").checked,
-    },
     expire_days: Number($("expire_days").value) || 7,
   };
 }
@@ -174,7 +310,7 @@ async function testSend() {
   toast("发送中…");
   try {
     const d = await call("test");
-    toast(d && d.ok ? "测试消息已发送 ✅" : "发送失败：" + ((d && d.error) || ""), d && d.ok ? "ok" : "err");
+    toast(d && d.ok ? "测试消息已发送" : "发送失败：" + ((d && d.error) || ""), d && d.ok ? "ok" : "err");
   } catch (e) {
     toast("发送失败：" + (e && e.message ? e.message : String(e)), "err");
   } finally {
@@ -205,7 +341,11 @@ async function runNow() {
 $("save").addEventListener("click", save);
 $("test").addEventListener("click", testSend);
 $("run").addEventListener("click", runNow);
-EVENTS.forEach((ev) => $("ev_" + ev).addEventListener("change", () => syncEventRow(ev)));
+$("add_target").addEventListener("click", () => {
+  targetRows.push(blankTarget());
+  renderTargets();
+});
+setupSecretToggles();
 
 // ---- 启动 ----
 if (!token) {
