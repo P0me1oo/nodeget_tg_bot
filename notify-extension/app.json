@@ -20,8 +20,8 @@
       ]
     }
   ],
-  "version": "2.1.0",
-  "description": "节点离线/上线、到期、流量配额提醒的 Telegram 通知；支持通知目标列表、逐目标事件开关、标签变量、到期/续费信息模板、流量配额提醒模板与 Telegram 内 /chatid 实时指令，逻辑由 notify-worker 提供",
+  "version": "2.2.0",
+  "description": "节点离线/上线、资源规则、到期、流量配额提醒的 Telegram 通知；支持秒级离线阈值、逐节点资源开关、通知目标列表、逐目标事件开关、标签变量、独立消息模板与 Telegram 内 /chatid 实时指令，逻辑由 notify-worker 提供",
   "extension_version": 1,
   "author": "laozig",
   "repository": "",

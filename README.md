@@ -80,7 +80,7 @@ flowchart LR
 |---|---|---|---|
 | `traffic-billing-worker` | `traffic-billing` | `0 */5 * * * *` | 每 5 分钟审计流量 |
 | `stream-unlock-worker` | `stream-unlock` | `0 0 0,12 * * *` | 一天两次；首访 `GET /results` 或 `GET /run` 自举 |
-| `notify-worker` | `notify` | `0 */2 * * * *` | 每 2 分钟检测事件；`/chatid` 通过 webhook 实时回复 |
+| `notify-worker` | `notify` | `*/30 * * * * *` | 每 30 秒扫描一次；`/chatid` 通过 webhook 实时回复 |
 | `log-cleanup-worker` | `log-cleanup` | 无需 Server cron | 改用 `GET /install` 给各机装本地清理 cron |
 
 **扩展**（在「扩展管理 → 安装」装对应 zip）：
@@ -112,10 +112,10 @@ flowchart LR
 
 ## 三、消息通知 · notify
 
-离线/上线/到期/流量配额提醒 → Telegram（对齐 Komari）。90 秒无上报判离线、合并成条、失败重试；到期每天一次；流量经 `inlineCall` 读 traffic 告警节点,从可配置阈值(默认 80%)起每 +5% 档位提醒。离线/上线、到期/续费、流量配额提醒分别支持独立模板。
+离线/上线/资源规则/到期/流量配额提醒 → Telegram（对齐 Komari）。默认每 30 秒扫描一次,只读取 NodeGet 已有动态摘要,不主动探测节点；离线阈值按秒配置,新节点未见过有效上报时先等待首次上报；CPU/内存/磁盘告警可按节点独立开启,连续超过阈值达到持续时间才触发；到期每天一次；流量经 `inlineCall` 读 traffic 告警节点,从可配置阈值(默认 80%)起每 +5% 档位提醒。离线/上线、资源规则、到期/续费、流量配额提醒分别支持独立模板。
 
 - **Worker**：`onCall` `get_config` / `set_config` / `test` / `run` / `get_state`；`onCron` 负责事件检测；`onRoute` 只负责 Telegram webhook 注册、注销和 update 接收，不提供内置 `/ui`。
-- **扩展**（`notify-extension/`）：iframe 完整配置面板，用 NodeGet Token 调 `js-worker_run` → 轮询 `js-result_query`，和 Docker/流量监控一致。Telegram 的 `bot_token` / 通知目标列表 / `webhook_admin_secret` 可在扩展面板填（存 KV、打码回显）；每个通知目标可单独配置 Chat ID、话题 ID、离线、恢复、到期、流量和启用状态。离线/上线模板可使用 `{{clients}}`、`{{node_count}}`、`{{last_seen}}`、`{{offline_duration}}`、`{{offline_delay}}`、`{{tags}}` 等变量;到期/续费信息模板读取 `metadata_price`、`metadata_price_unit`、`metadata_price_cycle`、`metadata_expire_time` 与 `metadata_tags`;流量配额提醒模板可使用 `{{traffic_used}}`、`{{traffic_quota}}`、`{{traffic_percent}}`、`{{traffic_level}}`、`{{traffic_reset_day}}` 等变量。`{{event}}` 会按到期状态或流量使用率动态显示。worker token 建议给 Agent namespace 的 `metadata_*` 读权限;缺少标签/价格等可选字段权限时会降级为空。也可在 Telegram 内发送 `/chatid` 让 Bot 实时回复当前会话 ID。
+- **扩展**（`notify-extension/`）：iframe 完整配置面板，用 NodeGet Token 调 `js-worker_run` → 轮询 `js-result_query`，和 Docker/流量监控一致。Telegram 的 `bot_token` / 通知目标列表 / `webhook_admin_secret` 可在扩展面板填（存 KV、打码回显）；每个通知目标可单独配置 Chat ID、话题 ID、离线、恢复、资源、到期、流量和启用状态。离线监控覆盖全部未删除节点;节点列表排序对齐 NodeGet 节点管理,用于逐节点开启 CPU、内存和磁盘资源告警；节点删除或不在活跃节点列表内时会清理旧状态且不再发送该节点离线/恢复。离线/上线模板可使用 `{{clients}}`、`{{node_count}}`、`{{last_seen}}`、`{{offline_duration}}`、`{{offline_threshold}}`、`{{recovery_time}}`、`{{tags}}` 等变量;资源告警/恢复模板可使用 `{{resource_type}}`、`{{resource_value}}`(当前值)、`{{resource_threshold}}`(告警阈值)、`{{resource_duration}}`(超限持续阈值)、`{{resource_since}}`、`{{recovery_time}}`;到期/续费信息模板读取 `metadata_price`、`metadata_price_unit`、`metadata_price_cycle`、`metadata_expire_time` 与 `metadata_tags`;流量配额提醒模板可使用 `{{traffic_used}}`、`{{traffic_quota}}`、`{{traffic_percent}}`、`{{traffic_level}}`、`{{traffic_reset_day}}` 等变量。`{{event}}` 会按到期状态、资源告警/恢复或流量使用率动态显示。worker token 建议给 Agent namespace 的 `metadata_*` 读权限;缺少标签/价格等可选字段权限时会降级为空。也可在 Telegram 内发送 `/chatid` 让 Bot 实时回复当前会话 ID。
 - **Telegram webhook**：worker 需设置 `route_name`（示例 `notify`），并确保该 HTTPS 路由可被 Telegram 访问；保存 Bot Token 后访问 `https://你的域名/nodeget/worker-route/notify/registerWebhook` 注册。注册成功时会同步把 `chatid` 写入 Telegram 命令列表,用户输入 `/` 时可看到该快捷命令。如配置了 Webhook 管理密钥，注册、注销和查询时加 `?s=密钥`。注销为 `/unRegisterWebhook`，查询为 `/webhookInfo`。
 - env：`token`（NodeGet 平台 Token，**不是** Telegram token）；`webhook_admin_secret`（可选，和扩展面板配置二选一或同时保留）。
 

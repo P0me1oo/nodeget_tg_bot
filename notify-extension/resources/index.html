@@ -63,6 +63,7 @@
                 <th>话题 ID</th>
                 <th>离线</th>
                 <th>恢复</th>
+                <th>资源</th>
                 <th>到期</th>
                 <th>流量</th>
                 <th>启用</th>
@@ -91,17 +92,53 @@
     <div class="card">
       <h3>
         <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" x2="4" y1="22" y2="15"/></svg>
-        事件参数
+        通知阈值
       </h3>
-      <div class="d">事件是否发送由通知目标列表逐行控制。</div>
+      <div class="d">事件是否发送由通知目标列表逐行控制；扫描只读取 NodeGet 已有动态摘要。</div>
       <div class="body">
-        <div>
-          <label class="f">到期提前提醒（天）</label>
-          <input type="number" id="expire_days" class="input compact-input" min="1" max="90" value="7" />
+        <div class="threshold-grid">
+          <div class="threshold-col">
+            <label class="f">离线阈值（秒）</label>
+            <input type="number" id="offline_threshold_sec" class="input compact-input" min="1" max="604800" value="90" />
+            <label class="f">到期提前提醒阈值（天）</label>
+            <input type="number" id="expire_days" class="input compact-input" min="1" max="90" value="7" />
+            <label class="f">流量告警阈值（%）</label>
+            <input type="number" id="traffic_threshold" class="input compact-input" min="1" max="200" value="80" />
+          </div>
+          <div class="threshold-col">
+            <label class="f">CPU 告警阈值（%）</label>
+            <input type="number" id="cpu_threshold" class="input compact-input" min="1" max="100" value="90" />
+            <label class="f">内存告警阈值（%）</label>
+            <input type="number" id="memory_threshold" class="input compact-input" min="1" max="100" value="90" />
+            <label class="f">磁盘告警阈值（%）</label>
+            <input type="number" id="disk_threshold" class="input compact-input" min="1" max="100" value="90" />
+            <label class="f">资源超限持续阈值（秒）</label>
+            <input type="number" id="resource_duration_sec" class="input compact-input" min="0" max="604800" value="300" />
+          </div>
         </div>
-        <div>
-          <label class="f">流量提醒阈值（%）</label>
-          <input type="number" id="traffic_threshold" class="input compact-input" min="1" max="200" value="80" />
+      </div>
+    </div>
+
+    <!-- 节点监控 -->
+    <div class="card">
+      <h3>
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="8" x="4" y="4" rx="2"/><rect width="16" height="8" x="4" y="12" rx="2"/><path d="M8 8h.01"/><path d="M8 16h.01"/></svg>
+        节点监控
+      </h3>
+      <div class="d">离线监控覆盖全部未删除节点；资源告警按节点独立启用。</div>
+      <div class="body">
+        <div class="target-table-wrap node-table-wrap">
+          <table class="target-table node-table">
+            <thead>
+              <tr>
+                <th>节点</th>
+                <th>CPU</th>
+                <th>内存</th>
+                <th>磁盘</th>
+              </tr>
+            </thead>
+            <tbody id="nodes_body"></tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -116,7 +153,10 @@
       <div class="body">
         <label class="f">离线/上线模板</label>
         <textarea id="template" class="input"></textarea>
-        <div class="tags">支持消息变量：<code>{{emoji}}</code> <code>{{event}}</code> <code>{{client}}</code>（节点名） <code>{{clients}}</code> <code>{{node_count}}</code> <code>{{status}}</code> <code>{{last_seen}}</code> <code>{{last_seen_list}}</code> <code>{{offline_duration}}</code> <code>{{offline_duration_list}}</code> <code>{{offline_delay}}</code> <code>{{time}}</code>（CST） <code>{{type}}</code> <code>{{tags}}</code> <code>{{tag_count}}</code></div>
+        <div class="tags">支持消息变量：<code>{{emoji}}</code> <code>{{event}}</code> <code>{{client}}</code>（节点名） <code>{{clients}}</code> <code>{{node_count}}</code> <code>{{status}}</code> <code>{{last_seen}}</code> <code>{{last_seen_list}}</code> <code>{{offline_duration}}</code> <code>{{offline_duration_list}}</code> <code>{{offline_threshold}}</code> <code>{{recovery_time}}</code> <code>{{time}}</code>（CST） <code>{{type}}</code> <code>{{tags}}</code> <code>{{tag_count}}</code></div>
+        <label class="f">资源告警/恢复模板</label>
+        <textarea id="resource_template" class="input"></textarea>
+        <div class="tags">仅资源告警/恢复支持：<code>{{event}}</code> <code>{{status}}</code> <code>{{client}}</code> <code>{{resource_type}}</code>（CPU/内存/磁盘） <code>{{resource_value}}</code>（当前值） <code>{{resource_threshold}}</code>（告警阈值） <code>{{resource_duration}}</code>（超限持续阈值） <code>{{resource_since}}</code> <code>{{recovery_time}}</code> <code>{{time}}</code> <code>{{tags}}</code></div>
         <label class="f">到期/续费信息模板</label>
         <textarea id="renew_template" class="input"></textarea>
         <div class="tags">仅到期通知支持：<code>{{emoji}}</code> <code>{{event}}</code> <code>{{status}}</code> <code>{{client}}</code> <code>{{time}}</code> <code>{{type}}</code> <code>{{expire_time}}</code> <code>{{days_left}}</code> <code>{{days_left_text}}</code> <code>{{price}}</code> <code>{{price_unit}}</code> <code>{{price_cycle}}</code> <code>{{renewal_price}}</code> <code>{{tags}}</code></div>

@@ -2,6 +2,24 @@
 
 本文件记录 `js_workers` 仓库的主要变更。
 
+## [1.4.0] - 2026-07-02
+
+### Added
+- `notify-worker` 升级为 `v1.3.0`,新增秒级离线阈值 `offline_threshold_sec`,替代旧“告警延迟”概念;节点最后上报超过阈值后,下一次扫描立即触发离线通知。
+- `notify-worker` 离线监控覆盖全部未删除节点,并在节点删除或不在活跃节点列表内时清理旧状态。
+- `notify-worker` 新增等待首次上报状态:新启用但从未见过有效动态摘要的节点不会直接报离线。
+- `notify-worker` 新增 CPU、内存、磁盘资源规则告警,可按节点独立开启;资源类告警需连续超过阈值达到配置持续时间后才发送。
+- `notify-worker` 新增 `resource_template` 资源告警/恢复模板,支持 `{{resource_type}}`、`{{resource_value}}`、`{{resource_threshold}}`、`{{resource_duration}}`、`{{resource_since}}`、`{{recovery_time}}` 等变量。
+- `notify-extension` 新增离线阈值、资源阈值/持续时间和节点级 CPU/内存/磁盘开关配置。
+- `notify-extension` 节点监控列表排序对齐 NodeGet 节点管理。
+
+### Changed
+- `notify-worker` 推荐 Cron 改为 `*/30 * * * * *`,每 30 秒扫描一次。
+- 离线、恢复、资源告警和资源恢复均按状态变化发送;持续离线或持续超阈值不重复推送。
+- 节点删除或不在活跃节点列表内时会清理旧状态,不再发送该节点离线或恢复通知。
+- 恢复通知记录并展示离线前最后上报时间、离线持续时间和恢复检测时间。
+- 通知扫描只读取 NodeGet 已有动态摘要数据,不主动探测节点。
+
 ## [1.3.0] - 2026-07-01
 
 ### Added

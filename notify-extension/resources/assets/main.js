@@ -23,10 +23,13 @@ window.addEventListener("message", (e) => {
 const $ = (id) => document.getElementById(id);
 const bannerEl = $("banner");
 const toastEl = $("toast");
-const EVENTS = ["offline", "online", "expire", "traffic"];
-const EVENT_LABELS = { offline: "离线", online: "恢复", expire: "到期", traffic: "流量" };
-const DEFAULT_TARGET_EVENTS = { offline: true, online: true, expire: true, traffic: false };
+const EVENTS = ["offline", "online", "resource", "expire", "traffic"];
+const EVENT_LABELS = { offline: "离线", online: "恢复", resource: "资源", expire: "到期", traffic: "流量" };
+const DEFAULT_TARGET_EVENTS = { offline: true, online: true, resource: true, expire: true, traffic: false };
+const RESOURCE_TYPES = ["cpu", "memory", "disk"];
+const RESOURCE_LABELS = { cpu: "CPU", memory: "内存", disk: "磁盘" };
 let targetRows = [];
+let nodeRows = [];
 
 function showBanner(m) { bannerEl.textContent = m; bannerEl.classList.remove("hidden"); }
 function clearBanner() { bannerEl.textContent = ""; bannerEl.classList.add("hidden"); }
@@ -112,6 +115,7 @@ function normalizeEventFlags(events, fallback) {
   return {
     offline: events.offline != null ? events.offline !== false : fallback.offline !== false,
     online: events.online != null ? events.online !== false : fallback.online !== false,
+    resource: events.resource != null ? events.resource === true : fallback.resource === true,
     expire: events.expire != null ? events.expire !== false : fallback.expire !== false,
     traffic: events.traffic != null ? events.traffic === true : fallback.traffic === true,
   };
@@ -161,6 +165,21 @@ function makeCheckbox(checked, label, onChange) {
   input.setAttribute("aria-label", label);
   input.addEventListener("change", () => onChange(input.checked));
   wrap.appendChild(input);
+  return wrap;
+}
+function makePillSwitch(checked, label, onChange) {
+  const wrap = document.createElement("label");
+  wrap.className = "pill-switch";
+  wrap.title = label;
+  const input = document.createElement("input");
+  input.type = "checkbox";
+  input.checked = !!checked;
+  input.setAttribute("aria-label", label);
+  const track = document.createElement("span");
+  track.className = "pill-track";
+  input.addEventListener("change", () => onChange(input.checked));
+  wrap.appendChild(input);
+  wrap.appendChild(track);
   return wrap;
 }
 function renderTargets() {
@@ -222,10 +241,92 @@ function collectTargets() {
   if (missingChat) throw new Error("通知目标「" + (missingChat.name || "未命名") + "」缺少 Chat ID");
   return filled.filter((target) => target.chat_id);
 }
-function fill(c) {
+function normalizeResourceRules(rules) {
+  rules = rules && typeof rules === "object" ? rules : {};
+  const out = {};
+  RESOURCE_TYPES.forEach((type) => {
+    const rule = rules[type] || {};
+    out[type] = {
+      threshold_pct: Number(rule.threshold_pct) || 90,
+      duration_sec: Number(rule.duration_sec) || 300,
+    };
+  });
+  return out;
+}
+function normalizeNodeRuleFlags(rules) {
+  rules = rules && typeof rules === "object" ? rules : {};
+  const out = {};
+  RESOURCE_TYPES.forEach((type) => {
+    out[type] = { enabled: !!(rules[type] && rules[type].enabled) };
+  });
+  return out;
+}
+function buildNodeRows(configNodes, availableNodes) {
+  const configMap = new Map((Array.isArray(configNodes) ? configNodes : []).map((node) => [node.uuid, node]));
+  return (Array.isArray(availableNodes) ? availableNodes : []).map((node) => {
+    const saved = configMap.get(node.uuid) || {};
+    return {
+      uuid: node.uuid,
+      name: saved.name || node.name || node.uuid.slice(0, 8),
+      order: node.order == null ? null : node.order,
+      rules: normalizeNodeRuleFlags(saved.rules),
+    };
+  });
+}
+function renderNodes() {
+  const body = $("nodes_body");
+  if (!body) return;
+  body.textContent = "";
+  if (!nodeRows.length) {
+    const row = document.createElement("tr");
+    const cell = document.createElement("td");
+    cell.colSpan = 4;
+    cell.className = "muted empty-cell";
+    cell.textContent = "未读取到节点列表";
+    row.appendChild(cell);
+    body.appendChild(row);
+    return;
+  }
+  nodeRows.forEach((node, index) => {
+    const row = document.createElement("tr");
+
+    const nameCell = document.createElement("td");
+    setCellLabel(nameCell, "节点");
+    const name = document.createElement("div");
+    name.className = "node-name";
+    name.textContent = node.name || node.uuid.slice(0, 8);
+    const uuid = document.createElement("div");
+    uuid.className = "node-uuid";
+    uuid.textContent = node.uuid;
+    nameCell.appendChild(name);
+    nameCell.appendChild(uuid);
+    row.appendChild(nameCell);
+
+    RESOURCE_TYPES.forEach((type) => {
+      const cell = document.createElement("td");
+      cell.className = "target-flag";
+      setCellLabel(cell, RESOURCE_LABELS[type]);
+      cell.appendChild(makePillSwitch(node.rules[type].enabled, RESOURCE_LABELS[type], (checked) => { nodeRows[index].rules[type].enabled = checked; }));
+      row.appendChild(cell);
+    });
+
+    body.appendChild(row);
+  });
+}
+function collectNodes() {
+  return nodeRows.map((node) => ({
+    uuid: node.uuid,
+    name: node.name,
+    order: node.order == null ? null : node.order,
+    rules: normalizeNodeRuleFlags(node.rules),
+  }));
+}
+function fill(c, availableNodes) {
   c = c || {};
   $("enabled").checked = !!c.enabled;
+  $("offline_threshold_sec").value = c.offline_threshold_sec || 90;
   $("template").value = c.template || "";
+  $("resource_template").value = c.resource_template || "";
   $("renew_template").value = c.renew_template || "";
   $("traffic_template").value = c.traffic_template || "";
   configureSecretInput("bot_token", c.bot_token_set, c.bot_token_hint, "123456:ABC-DEF...");
@@ -236,11 +337,19 @@ function fill(c) {
   renderTargets();
   $("endpoint").value = c.endpoint || "https://api.telegram.org/bot";
   configureSecretInput("webhook_admin_secret", c.webhook_admin_secret_set, c.webhook_admin_secret_hint, "可选，建议使用长随机字符");
+  const resourceRules = normalizeResourceRules(c.resource_rules);
+  $("cpu_threshold").value = resourceRules.cpu.threshold_pct;
+  $("memory_threshold").value = resourceRules.memory.threshold_pct;
+  $("disk_threshold").value = resourceRules.disk.threshold_pct;
+  $("resource_duration_sec").value = resourceRules.cpu.duration_sec || 300;
   $("expire_days").value = c.expire_days || 7;
   $("traffic_threshold").value = c.traffic_threshold || 80;
+  nodeRows = buildNodeRows(c.nodes, availableNodes || []);
+  renderNodes();
 }
 function collect() {
   const targets = collectTargets();
+  const duration = Number($("resource_duration_sec").value) || 300;
   return {
     enabled: $("enabled").checked,
     channel: "telegram",
@@ -248,7 +357,15 @@ function collect() {
     targets,
     webhook_admin_secret: $("webhook_admin_secret").value.trim(),
     endpoint: $("endpoint").value.trim(),
+    nodes: collectNodes(),
+    offline_threshold_sec: Number($("offline_threshold_sec").value) || 90,
+    resource_rules: {
+      cpu: { threshold_pct: Number($("cpu_threshold").value) || 90, duration_sec: duration },
+      memory: { threshold_pct: Number($("memory_threshold").value) || 90, duration_sec: duration },
+      disk: { threshold_pct: Number($("disk_threshold").value) || 90, duration_sec: duration },
+    },
     template: $("template").value,
+    resource_template: $("resource_template").value,
     renew_template: $("renew_template").value,
     traffic_template: $("traffic_template").value,
     expire_days: Number($("expire_days").value) || 7,
@@ -271,7 +388,7 @@ function showStatus(st) {
   const ago = fmtAgo(st.last_run);
   if (!ago) {
     el.className = "statusbar warn";
-    tx.textContent = "尚未运行过检测 —— 请在「定时任务」配置 notify-worker（建议 cron 0 */2 * * * *）";
+    tx.textContent = "尚未运行过检测 —— 请在「定时任务」配置 notify-worker（建议 cron */30 * * * * *）";
   } else {
     el.className = "statusbar";
     tx.textContent = "上次检测 " + ago + " · 发出 " + (st.last_sent || 0) + " 条" + (st.last_note ? " · " + st.last_note : "");
@@ -283,9 +400,10 @@ async function load() {
   try {
     const d = await call("get_config");
     if (!d || d.ok === false) throw new Error((d && d.error) || "加载失败");
-    fill(d.config);
+    fill(d.config, d.available_nodes);
     showStatus(d.state);
-    clearBanner();
+    if (d.node_error) showBanner("节点列表读取失败：" + d.node_error);
+    else clearBanner();
   } catch (e) {
     showBanner("加载失败：" + (e && e.message ? e.message : String(e)) +
       "\n（确认已部署 " + WORKER_NAME + "，且本扩展安装时授予了 JsWorker 运行 + JsResult 读取权限）");
