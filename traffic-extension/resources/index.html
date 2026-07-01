@@ -24,7 +24,7 @@
       <div class="summary" id="summary"></div>
       <table class="ctab">
         <thead>
-          <tr><th>节点</th><th>监控</th><th>本期用量</th><th>方向</th><th>起算日</th><th></th></tr>
+          <tr><th>节点</th><th>监控</th><th>用量</th><th>方向</th><th>计费</th><th></th></tr>
         </thead>
         <tbody id="rows"><tr><td colspan="6" class="muted center">加载中…</td></tr></tbody>
       </table>
@@ -41,7 +41,7 @@
         <div class="single-meta" id="sg-meta"></div>
         <div class="row-actions" style="margin-top:16px">
           <button id="sg-config" class="btn btn-primary btn-sm">配置</button>
-          <button id="sg-reset" class="btn btn-danger btn-sm">重置本期</button>
+          <button id="sg-reset" class="btn btn-danger btn-sm">重置用量</button>
         </div>
       </div>
     </section>
@@ -54,22 +54,63 @@
       <div class="cfg-form">
         <label class="row-check"><input type="checkbox" id="cfg-enabled" /> 启用流量监控</label>
         <label>计费方向
-          <select id="cfg-mode" class="input">
+          <select id="cfg-mode" class="input choice-native">
             <option value="outbound">出网（上传 ↑）</option>
             <option value="inbound">入网（下载 ↓）</option>
             <option value="both">双向 ↕</option>
           </select>
+          <div class="choice-group" data-choice-for="cfg-mode" aria-label="计费方向"></div>
+        </label>
+        <label>计费模式
+          <select id="cfg-billing-mode" class="input choice-native">
+            <option value="period">按周期计费</option>
+            <option value="traffic_package">按流量计费，不限时</option>
+          </select>
+          <div class="choice-group" data-choice-for="cfg-billing-mode" aria-label="计费模式"></div>
         </label>
         <label>起算日（每月 1–31，短月自动落月末）
-          <input id="cfg-day" class="input" type="number" min="1" max="31" />
+          <div class="inline-field">
+            <input id="cfg-day" class="input" type="number" min="1" max="31" />
+            <button id="cfg-expire-day" class="btn" type="button">从到期日设置</button>
+          </div>
+          <span id="cfg-day-hint" class="hint hidden"></span>
         </label>
-        <label>配额 GB（留空 = 不限额 / 不告警）
-          <input id="cfg-quota" class="input" type="number" min="0" step="0.1" placeholder="留空不限额" />
-        </label>
+        <div id="cfg-package-fields" class="field-group hidden">
+          <label>额度方式
+            <select id="cfg-limit-type" class="input choice-native">
+              <option value="traffic">按流量额度</option>
+              <option value="cost">按金额额度</option>
+            </select>
+            <div class="choice-group" data-choice-for="cfg-limit-type" aria-label="额度方式"></div>
+          </label>
+          <label>总流量额度 GB（留空 = 只统计 / 不告警）
+            <input id="cfg-quota" class="input" type="number" min="0" step="0.1" placeholder="例如 1000" />
+          </label>
+          <div id="cfg-cost-fields" class="field-grid hidden">
+            <label>单价 / GB
+              <input id="cfg-unit-price" class="input" type="number" min="0" step="0.000001" placeholder="例如 0.00006" />
+            </label>
+            <label>预算金额
+              <input id="cfg-budget" class="input" type="number" min="0" step="0.01" placeholder="例如 10" />
+            </label>
+            <label>金额单位
+              <input id="cfg-budget-unit" class="input" maxlength="16" placeholder="例如 $" />
+            </label>
+          </div>
+          <div class="append-row">
+            <input id="cfg-add-quota" class="input" type="number" min="0" step="0.1" placeholder="追加 GB" />
+            <button id="cfg-append-quota" class="btn" type="button">追加流量</button>
+          </div>
+        </div>
+        <div id="cfg-period-fields">
+          <label>配额 GB（留空 = 不限额 / 不告警）
+            <input id="cfg-period-quota" class="input" type="number" min="0" step="0.1" placeholder="留空不限额" />
+          </label>
+        </div>
       </div>
       <div id="cfg-error" class="banner hidden"></div>
       <div class="confirm-actions">
-        <button id="cfg-reset" class="btn btn-danger">重置本期</button>
+        <button id="cfg-reset" class="btn btn-danger">重置用量</button>
         <span style="flex:1"></span>
         <button id="cfg-cancel" class="btn">取消</button>
         <button id="cfg-save" class="btn btn-primary">保存</button>

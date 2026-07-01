@@ -2,6 +2,22 @@
 
 本文件记录 `js_workers` 仓库的主要变更。
 
+## [1.3.0] - 2026-07-01
+
+### Added
+- `traffic-billing-worker` 升级为 `v3.2.0`,新增 `billing_mode:"period"|"traffic_package"`;旧配置没有该字段时继续按周期计费。
+- 流量包模式支持按总流量 `quota_gb` 或按金额预算 `unit_price_per_gb` + `budget_amount` 计算达量比例,金额单位支持 `budget_unit` 自由文本。
+- 流量监控扩展新增“从到期日设置”按钮,读取节点 `metadata_expire_time` 并兼容 `YYYY-MM-DD`、`YYYY/MM/DD`、秒时间戳和毫秒时间戳。
+- 流量监控扩展新增流量包配置、追加流量、重置用量和直接修改总额度/预算字段。
+- `traffic-billing-worker` 的 `list` / `get_config` 返回 `expire_time`、`expire_date`、`expire_billing_day` 等只读快捷字段。
+- `traffic-billing-worker` 新增 `append_quota` action 和 `POST /append-quota` 路由。
+
+### Changed
+- 流量包模式不会按起算日自动重置累计用量,只在用户手动重置时清零;周期模式仍按原起算日逻辑运行。
+- 达量提醒统一为 80% 起每 +5% 一档,100% 文案可区分达量,超过 100% 可区分超量。
+- `traffic-billing-worker` 的 `list` 排序改为对齐 NodeGet 节点管理:有效 `metadata_order` 优先按数值升序,无有效排序值的节点排后并用 uuid 稳定排序。
+- 流量监控扩展在周期模式显示“本期用量 / 起算日”,在流量包模式显示“已用流量 / 总额度 / 剩余额度”或费用预算信息。
+
 ## [1.2.1] - 2026-07-01
 
 ### Added

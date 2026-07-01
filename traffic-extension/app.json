@@ -26,9 +26,9 @@
       ]
     }
   ],
-  "version": "1.0",
-  "description": "逐台节点流量周期记账与配额告警；扩展内置配置面板，数据由 traffic-billing-worker 提供",
-  "extension_version": 1,
+  "version": "1.1.0",
+  "description": "逐台节点流量周期/流量包记账与配额告警；扩展内置配置面板，数据由 traffic-billing-worker 提供",
+  "extension_version": 2,
   "author": "",
   "repository": "",
   "homepage": "",

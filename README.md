@@ -23,7 +23,7 @@
 
 凡是需要**累计、定时、持久化**的功能，必须有一个 worker 在 Server 端常驻：
 
-- **流量监控**：每 5 分钟用探针计数器差值累加“本期已用”，存 KV，按月重置 —— 前端不可能代劳。
+- **流量监控**：每 5 分钟用探针计数器差值累加用量，存 KV；周期模式按月重置，流量包模式持续累计 —— 前端不可能代劳。
 - **流媒体 / 通知 / 日志清理**：都靠各自的 **Server 定时任务（cron）**周期性跑。
 
 > 经验法则：**要“持续统计/累计/定时”的，一定要 worker；只做“即时一次性操作”的，可以纯扩展。**
@@ -95,10 +95,10 @@ flowchart LR
 
 ## 一、流量监控 · traffic-billing
 
-**统计口径**：记的是**本计费周期内新增的流量增量**（worker 用计数器差值累加，到起算日清零），不是“开机以来累计”。按自然月、东八区起算日重置，短月自动落月末；计费方向出/入/双向；节点重启计数器归零自动容错。配额留空=只统计不告警，填数字→默认 80% 起每 +5% 一档告警；notify 可传入自定义提醒阈值。
+**统计口径**：worker 用探针计数器差值累加新增流量，不是“开机以来累计”。周期模式按自然月、东八区起算日重置，短月自动落月末；流量包模式不限时，不按起算日自动清零，直到用户手动重置。计费方向出/入/双向，未配置方向时默认双向；节点重启计数器归零自动容错。配额或预算有效时默认 80% 起每 +5% 一档告警；notify 可传入自定义提醒阈值。
 
-- **Worker**：`onCall` 动作 `list` / `get_summary` / `get_config` / `set_config` / `audit_now` / `reset_node`。HTTP 路由 `GET /list`、`GET /summary`（公开，供 StatusShow 读）+ `/config`、`/audit`、`/reset`（`route_secret` 保护）。**已无内置 `/ui`**（配置面板移到扩展）。
-- **扩展**（`traffic-extension/`）：iframe 完整 UI（不跳转），用 NodeGet Token 调 `js-worker_run` → 轮询 `js-result_query`。`app.json.limits` 已声明 `JsWorker::RunDefinedJsWorker` + `JsResult::Read`，scope `traffic-billing-worker`。两个入口：应用区=全部节点表格；每台机器页=单机视图。`WORKER_NAME` 须与 worker 脚本名一致。
+- **Worker**：`onCall` 动作 `list` / `get_summary` / `get_config` / `set_config` / `append_quota` / `audit_now` / `reset_node`。HTTP 路由 `GET /list`、`GET /summary`（公开，供 StatusShow 读）+ `/config`、`/append-quota`、`/audit`、`/reset`（`route_secret` 保护）。**已无内置 `/ui`**（配置面板移到扩展）。
+- **扩展**（`traffic-extension/`）：iframe 完整 UI（不跳转），用 NodeGet Token 调 `js-worker_run` → 轮询 `js-result_query`。支持按周期计费、流量包按 GB 额度、流量包按金额预算、追加流量、重置用量，并可从节点 `metadata_expire_time` 快速填入起算日。`app.json.limits` 已声明 `JsWorker::RunDefinedJsWorker` + `JsResult::Read`，scope `traffic-billing-worker`。两个入口：应用区=全部节点表格；每台机器页=单机视图。`WORKER_NAME` 须与 worker 脚本名一致。
 - env：`token`（必填）；`route_secret`（可选，仅保护 `/config` 等写路由）。
 
 ## 二、流媒体检测 · stream-unlock
@@ -187,7 +187,7 @@ EOF
 
 | Worker | 命名空间 | Key | 内容 |
 |---|---|---|---|
-| traffic | 每节点 `<uuid>` | `traffic_billing_config` | `{enabled,billing_day,mode,quota_gb}` |
+| traffic | 每节点 `<uuid>` | `traffic_billing_config` | `{enabled,billing_day,mode,billing_mode,package_limit_type,quota_gb,unit_price_per_gb,budget_amount,budget_unit}` |
 | traffic | 每节点 `<uuid>` | `traffic_billing_ledger` | `{snapshot:{累计/告警/周期}}` |
 | notify | `global` | `notify_config` / `notify_state` | 配置（含 bot_token）/ 状态 |
 | stream-unlock | `global` | `stream_unlock_agent_config` / `..._state` | 配置 / 安装与缓存状态 |
